@@ -1,0 +1,126 @@
+name: Release Changes
+
+on:
+  workflow_run:
+    workflows: ["Validate Changes"]
+    branches: [main]
+    types:
+      - completed
+
+jobs:
+  begin-release:
+    name: Begin Release
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success'
+    steps:
+      - run: echo "Beginning release."
+      - name: "Transfer 'version-json' artifact from triggering workflow"
+        uses: pwshrc/actions-transfer-artifact@v0.3.7
+        with:
+          name: 'version-json'
+      - name: "Transfer 'PSGallery-package' artifact from triggering workflow"
+        uses: pwshrc/actions-transfer-artifact@v0.3.7
+        with:
+          name: 'PSGallery-package'
+      - name: "Transfer 'release-notes' artifact from triggering workflow"
+        uses: pwshrc/actions-transfer-artifact@v0.3.7
+        with:
+          name: 'release-notes'
+
+  test-publish-psgallery-package:
+    name: Test Publish to PSGallery
+    runs-on: ubuntu-latest
+    needs: [begin-release]
+    steps:
+    - name: Check out repository code
+      uses: actions/checkout@v3
+    - name: Populate GitVersion variables
+      id: gitversion_vars
+      uses: pwshrc/actions-determine-version@v0.8.5
+      with:
+        mode: 'download'
+    - name: "Get artifact: PSGallery-package"
+      uses: actions/download-artifact@v3
+      with:
+        name: PSGallery-package
+        path: ./out/
+    - name: Publish Prerelease to PSGallery (WhatIf)
+      if: steps.gitversion_vars.outputs.PreReleaseTag != ''
+      uses: pwshrc/actions-invoke-lib-dependent-pwsh@v0.2.7
+      with:
+        run: ./build/publish.ps1 -NUGET_KEY "abc" -Prerelease -WhatIf
+    - name: Publish Release to PSGallery (WhatIf)
+      if: steps.gitversion_vars.outputs.PreReleaseTag == ''
+      uses: pwshrc/actions-invoke-lib-dependent-pwsh@v0.2.7
+      with:
+        run: ./build/publish.ps1 -NUGET_KEY "abc" -WhatIf
+
+  publish-psgallery-package:
+    name: Publish to PSGallery
+    runs-on: ubuntu-latest
+    needs: [test-publish-psgallery-package]
+    steps:
+    - name: Check out repository code
+      uses: actions/checkout@v3
+    - name: Populate GitVersion variables
+      id: gitversion_vars
+      uses: pwshrc/actions-determine-version@v0.8.5
+      with:
+        mode: 'download'
+    - name: "Get artifact: PSGallery-package"
+      uses: actions/download-artifact@v3
+      with:
+        name: PSGallery-package
+        path: ./out/
+    - name: Publish Prerelease to PSGallery
+      if: steps.gitversion_vars.outputs.PreReleaseTag != ''
+      uses: pwshrc/actions-invoke-lib-dependent-pwsh@v0.2.7
+      env:
+        NUGET_KEY: ${{ secrets.NUGET_KEY }}
+      with:
+        run: ./build/publish.ps1 -NUGET_KEY "$env:NUGET_KEY" -Prerelease
+    - name: Publish Release to PSGallery
+      if: steps.gitversion_vars.outputs.PreReleaseTag == ''
+      uses: pwshrc/actions-invoke-lib-dependent-pwsh@v0.2.7
+      env:
+        NUGET_KEY: ${{ secrets.NUGET_KEY }}
+      with:
+        run: ./build/publish.ps1 -NUGET_KEY "$env:NUGET_KEY"
+
+  publish-github-release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs: [publish-psgallery-package]
+    steps:
+    - name: Check out repository code
+      uses: actions/checkout@v3
+    - name: Get GitVersion
+      id: gitversion_vars
+      uses: pwshrc/actions-determine-version@v0.8.5
+      with:
+        mode: 'download'
+    - name: Get release notes
+      id: get-releasenotes
+      uses: pwshrc/actions-create-release-notes@v0.8.6
+      with:
+        mode: 'download'
+        github_token: "${{ secrets.GITHUB_TOKEN }}"
+    - name: "Get artifact: PSGallery-package"
+      uses: actions/download-artifact@v3
+      with:
+        name: PSGallery-package
+        path: ./out/
+    - name: Publish GitHub release
+      id: publish_github_release
+      uses: softprops/action-gh-release@v1
+      with:
+        token: "${{ secrets.RELEASE_GITHUB_TOKEN }}"
+        name: "v${{ steps.gitversion_vars.outputs.SemVer }}"
+        tag_name: "v${{ steps.gitversion_vars.outputs.SemVer }}"
+        target_commitish: "${{ steps.gitversion_vars.outputs.Sha }}"
+        generate_release_notes: false
+        body_path: "${{ steps.get-releasenotes.outputs.filepath }}"
+        prerelease: ${{ steps.gitversion_vars.outputs.PreReleaseTag != '' }}
+        draft: false
+        files: ./out/*.nupkg
+        fail_on_unmatched_files: true
