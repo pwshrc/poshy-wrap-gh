@@ -1,0 +1,39 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:base"],
+  "automerge": true,
+  "automergeType": "pr",
+  "platformAutomerge": true,
+  "platformCommit": true,
+  "labels": [
+    "dependencies"
+  ],
+  "packageRules": [
+    {
+      "matchManagers": [
+        "github-actions"
+      ],
+      "enabled": false
+    },
+    {
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "matchDepTypes": ["dependencies", "devDependencies"],
+      "autoApprove": true,
+      "assignAutomerge": false
+    },
+    {
+      "matchDepTypes": ["devDependencies"],
+      "autoApprove": true,
+      "assignAutomerge": false
+    },
+    {
+      "matchUpdateTypes": ["major"],
+      "autoApprove": false,
+      "assignAutomerge": true,
+      "assignees": ["brucificus"]
+    }
+  ],
+  "commitMessageAction": "Updates",
+  "commitMessagePrefix": "⬆️",
+  "dependencyDashboardAutoclose": true
+}
