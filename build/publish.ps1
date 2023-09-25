@@ -13,6 +13,7 @@ param(
     [switch] $WhatIf
 )
 $ErrorActionPreference = "Stop"
+$InformationPreference = "Continue"
 Set-StrictMode -Version Latest
 
 
@@ -20,9 +21,7 @@ Set-StrictMode -Version Latest
 . "${PSScriptRoot}${ds}funcs${ds}Expand-PackageExportOutput.ps1"
 [System.IO.FileInfo] $psd1 = Expand-PackageExportOutput
 [hashtable] $psd1Data = Import-PowerShellDataFile -Path $psd1.FullName
-
-[string] $expandedModulePath = (Split-Path $psd1 -Parent)
-Remove-Item -Path $expandedModulePath -Filter "[Content_Types].xml" -Force -ErrorAction SilentlyContinue
+[string] $expandedModulePath = $psd1.Directory.FullName
 
 Publish-Module `
     -Path $expandedModulePath `
