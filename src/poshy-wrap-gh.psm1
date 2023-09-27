@@ -7,10 +7,7 @@ Get-ChildItem -Path "$PSScriptRoot/private/*.ps1" | ForEach-Object {
     . $_.FullName
 }
 
-[string[]] $functionsToExport = @()
 Get-ChildItem -Path "$PSScriptRoot/*.ps1" | ForEach-Object {
     . $_.FullName
-    $functionsToExport += $_.BaseName
+    Export-ModuleMember -Function $_.BaseName
 }
-
-Export-ModuleMember -Function *
