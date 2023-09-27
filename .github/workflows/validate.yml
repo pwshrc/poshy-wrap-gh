@@ -60,15 +60,18 @@ jobs:
     - name: Build PSGallery package
       uses: pwshrc/actions-invoke-lib-dependent-pwsh@v0.2.8
       env:
-        PackageVersionNuGet: ${{ steps.gitversion_vars.outputs.NuGetVersionV2 }}
-        PackageVersionMajorMinorPatchBuild: ${{ steps.gitversion_vars.outputs.AssemblySemVer }}
+        PackageVersion: ${{ steps.gitversion_vars.outputs.NuGetVersionV2 }}
+        ModuleVersionMajor: ${{ steps.gitversion_vars.outputs.Major }}
+        ModuleVersionMinor: ${{ steps.gitversion_vars.outputs.Minor }}
+        ModuleVersionPatch: ${{ steps.gitversion_vars.outputs.Patch }}
         PackageVersionPrereleaseTag: ${{ steps.gitversion_vars.outputs.PreReleaseTag }}
         CommitSha: ${{ steps.gitversion_vars.outputs.Sha }}
         ReleaseNotesFilepath: ${{ steps.get-releasenotes.outputs.filepath }}
       with:
         run: |
           [string] $releaseNotes = (Get-Content -Raw -Path ./out/release-notes.md -Encoding UTF8).Trim()
-          ./build/package.ps1 -PackageVersionNuGet $Env:PackageVersionNuGet -PackageVersionMajorMinorPatchBuild $Env:PackageVersionMajorMinorPatchBuild -PackageVersionPrereleaseTag $Env:PackageVersionPrereleaseTag -ReleaseNotes $releaseNotes -CommitSha $Env:CommitSha
+          [Version] $moduleVersion = [Version]::new($Env:ModuleVersionMajor, $Env:ModuleVersionMinor, $Env:ModuleVersionPatch)
+          ./build/package.ps1 -PackageVersion $Env:PackageVersion -ModuleVersion $moduleVersion -PackageVersionPrereleaseTag $Env:PackageVersionPrereleaseTag -ReleaseNotes $releaseNotes -CommitSha $Env:CommitSha
     - name: "Create artifact: PSGallery-package"
       uses: actions/upload-artifact@v3
       with:
