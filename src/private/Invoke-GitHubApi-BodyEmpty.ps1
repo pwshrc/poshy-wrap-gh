@@ -178,34 +178,42 @@ function Invoke-GitHubApi-BodyEmpty {
         }
         function ExpressCommandPart {
             param(
-                [System.Management.Automation.Runspaces.Command] $subcommand  # should be a stringbuilder
+                [System.Management.Automation.Runspaces.Command] $subcommand,
+                [System.Text.StringBuilder] $resultBuilder
             )
-            [System.Text.StringBuilder] $result = [System.Text.StringBuilder]::new()
-            $result.Append($subcommand.CommandText)
+            $resultBuilder.Append($subcommand.CommandText)
             foreach ($subcommandParameter in $subcommand.Parameters) {
-                $result.Append(" ")
-                $result.Append($subcommandParameter.Name)
+                $resultBuilder.Append(" ")
+                $resultBuilder.Append($subcommandParameter.Name)
                 if ($subcommandParameter.Value) {
-                    $result.Append(" ")
-                    $result.Append($subcommandParameter.Value)
+                    $resultBuilder.Append(" ")
+                    $resultBuilder.Append($subcommandParameter.Value)
                 }
             }
             if ($subcommand.MergeUnclaimedPreviousCommandResults -ne 0) {
-                $result.Append(" 2>&1")
-            }
-            return $result.ToString()
-        }
-
-        [System.Management.Automation.PSCommand] $commandFinal = $ghCommand.Clone()
-
-        if ($null -ne $outputHandlingCommand) {
-            foreach ($outputHandlingCommandCommand in $outputHandlingCommand.Commands) {
-                $commandFinal = AccumulatePSCommand -accumulate $commandFinal -subcommand $outputHandlingCommandCommand
+                $resultBuilder.Append(" 2>&1")
             }
         }
 
-        # don't use the above loop.
-        # instead, express them out into a stringbuilder. interleave with pipes and semicolons. (if not is first command in statement, use pipe, unless IsEndOfStatement then instead use semicolon and mark as first command in statement again.)
+        # express them out into a stringbuilder. interleave with pipes and semicolons. (if not is first command in statement, use pipe, unless IsEndOfStatement then instead use semicolon and mark as first command in statement again.)
+        [System.Text.StringBuilder] $commandFinal = [System.Text.StringBuilder]::new()
+        [bool] $first = $true
+        foreach ($command in $ghCommand.Commands) {
+            if (-not $first) {
+                if ($command.IsEndOfStatement) {
+                    $commandFinal.Append("; ")
+                    $first = $true
+                } else {
+                    $commandFinal.Append(" | ")
+                }
+            }
+            ExpressCommandPart -subcommand $command -resultBuilder $commandFinal
+            if ($first) {
+                $first = $false
+            }
+        }
+
+
         # then invoke-expression the stringbuilder.
 
         # with these in place, backport changes to original script.
